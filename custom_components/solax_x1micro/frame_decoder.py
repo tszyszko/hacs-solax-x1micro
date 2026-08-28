@@ -56,7 +56,10 @@ def decode_solax_frame(data: bytes) -> dict[str, Any] | None:
 
     Data section (offsets relative to 0x3A) — layout is fixed regardless of mode:
       0   rated_power_W   ×1 W
-      2   const_0x0205    invariant frame-type marker (always 0x0205)
+      2   dsp_fw_version  DSP firmware version, one byte per component:
+                          +2 = major, +3 = minor (e.g. bytes 05 02 -> "005.02",
+                          bytes 04 06 -> "004.06").  Previously believed to be
+                          an invariant 0x0205 marker; it is firmware-specific.
       4   run_mode        enum (1=Normal, 0=Standby)
       5   reserved        always 0x0028
       7   grid_voltage_V  ×0.1 V
@@ -146,11 +149,11 @@ def decode_solax_frame(data: bytes) -> dict[str, Any] | None:
     def u8(off: int) -> int:
         return data[OFF + off]
 
-    # Validate invariant fields that distinguish real-time data from other
+    # Validate the reserved word that distinguishes real-time data from other
     # 107-byte frame variants that might share the same magic and function code.
-    if u16(2) != 0x0205:
-        _LOGGER.debug("Unexpected frame-type marker at offset 2: 0x%04X", u16(2))
-        return None
+    # NOTE: the word at offset 2 is NOT an invariant marker - it carries the DSP
+    # firmware version (0x0205 on 005.02 units, 0x0604 on 004.06 units), so it
+    # must not be used for validation.
     if u16(5) != 0x0028:
         _LOGGER.debug("Unexpected reserved field at offset 5: 0x%04X", u16(5))
         return None
@@ -176,9 +179,12 @@ def decode_solax_frame(data: bytes) -> dict[str, Any] | None:
         ppv2 = None
         pdc_total = None
 
+    dsp_fw_version = f"{u8(2):03d}.{u8(3):02d}"
+
     return {
         "wifi_sn": wifi_sn,
         "inverter_sn": inv_sn,
+        "dsp_fw_version": dsp_fw_version,
         "rated_power_W": u16(0),
         "run_mode": u8(4),
         "grid_voltage_V": u16(7) / 10.0,

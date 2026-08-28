@@ -110,6 +110,7 @@ generation, is documented in [CONFIG_MQTT.md](CONFIG_MQTT.md).
 | Key | Display name | Tested firmware
 |-----|-------------|----------------|
 | `x1_micro_2in1` | X1-Micro 2 in 1 | Wifi: 005.03 - DSP: 005.02
+| `x1_micro_2in1` | X1-Micro 2 in 1 | Wifi: 004.06 - DSP: 004.06
 
 More models may be added in future releases.
 
@@ -162,6 +163,7 @@ The integration will subscribe to the following MQTT topics:
 | Rated Power *(diagnostic)* | W | Inverter nominal rating |
 | Run Mode *(diagnostic)* | — | 1 = Normal, 0 = Standby |
 | Inverter Serial Number *(diagnostic)* | — | Serial number from binary frame |
+| DSP Firmware Version *(diagnostic)* | — | e.g. `005.02`, decoded from the real-time frame |
 
 ---
 
