@@ -37,6 +37,13 @@ class SolaxSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[dict[str, Any]], Any]
 
 
+def _format_event_codes(codes: list[dict[str, Any]] | None) -> str | None:
+    """Render event codes as e.g. ``+2 +3 +4`` (raised) / ``-2`` (cleared)."""
+    if not codes:
+        return None
+    return " ".join(f"{'-' if c['cleared'] else '+'}{c['code']}" for c in codes)
+
+
 SENSORS: tuple[SolaxSensorEntityDescription, ...] = (
     # ── AC / Grid ────────────────────────────────────────────────────────────
     SolaxSensorEntityDescription(
@@ -178,7 +185,9 @@ SENSORS: tuple[SolaxSensorEntityDescription, ...] = (
         key="run_mode",
         translation_key="run_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda d: {0: "standby", 1: "normal"}.get(d.get("run_mode")),
+        value_fn=lambda d: {0: "standby", 1: "normal", 3: "fault"}.get(
+            d.get("run_mode")
+        ),
     ),
     SolaxSensorEntityDescription(
         key="inverter_sn",
@@ -191,6 +200,19 @@ SENSORS: tuple[SolaxSensorEntityDescription, ...] = (
         translation_key="dsp_fw_version",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.get("dsp_fw_version"),
+    ),
+    SolaxSensorEntityDescription(
+        key="event_codes",
+        translation_key="event_codes",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: _format_event_codes(d.get("event_codes")),
+    ),
+    SolaxSensorEntityDescription(
+        key="last_event",
+        translation_key="last_event",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("event_time"),
     ),
     # ── Frame counters (diagnostic) ───────────────────────────────────────────
     SolaxSensorEntityDescription(

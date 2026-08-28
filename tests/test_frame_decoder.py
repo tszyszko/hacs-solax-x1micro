@@ -26,6 +26,8 @@ _spec.loader.exec_module(frame_decoder)
 
 crc16_buypass = frame_decoder.crc16_buypass
 decode_solax_frame = frame_decoder.decode_solax_frame
+decode_solax_event_frame = frame_decoder.decode_solax_event_frame
+is_valid_solax_frame = frame_decoder.is_valid_solax_frame
 
 # Real 107-byte real-time frame captured from an X1-Micro 2 in 1 running
 # WiFi firmware 004.06 (loc/tsp/<sn>, 2026-08-28).  Bytes 0x3C-0x3D are
@@ -43,6 +45,25 @@ FRAME_FW_004_06 = bytes.fromhex(
 FRAME_BOOT_FW_STRING = bytes.fromhex(
     "24242e000801020e33304d335931303130513036363400000000000000010e0b00"
     "010207000e3030342e303615a8"
+)
+
+# Event frames (run_mode 3) captured while the AC side was unplugged (first)
+# and plugged back in (second and third), 2026-08-28 17:32-17:33.
+FRAME_EVENT_RAISED = bytes.fromhex(
+    "242464000801011c33304d335931303130513036363400000000000000010e4100"
+    "0202190033304d335931303130513036363400000000000000b004040603210003"
+    "020003000400ea01eb010700cc0d8b1304000a0000000000002420000000000044"
+    "fb"
+)
+FRAME_EVENT_CLEARED_2 = bytes.fromhex(
+    "242460000801011c33304d335931303130513036363400000000000000010e3d00"
+    "0202190033304d335931303130513036363400000000000000b0040406031d0001"
+    "0280ea01eb010700cc0d8b1304000a00000000000024200000000000491c"
+)
+FRAME_EVENT_CLEARED_3_4 = bytes.fromhex(
+    "242462000801011c33304d335931303130513036363400000000000000010e3f00"
+    "0202190033304d335931303130513036363400000000000000b0040406031f0002"
+    "03800480ea01eb010700cc0d8b1304000a00000000000024200000000000bc76"
 )
 
 
@@ -102,6 +123,62 @@ class TestRealTimeFrame(unittest.TestCase):
 
     def test_rejects_boot_frame(self) -> None:
         self.assertIsNone(decode_solax_frame(FRAME_BOOT_FW_STRING))
+
+
+class TestEventFrame(unittest.TestCase):
+    def test_all_captured_frames_are_valid(self) -> None:
+        for frame in (
+            FRAME_FW_004_06,
+            FRAME_BOOT_FW_STRING,
+            FRAME_EVENT_RAISED,
+            FRAME_EVENT_CLEARED_2,
+            FRAME_EVENT_CLEARED_3_4,
+        ):
+            self.assertTrue(is_valid_solax_frame(frame))
+        self.assertFalse(is_valid_solax_frame(FRAME_FW_004_06[:-1]))
+        self.assertFalse(is_valid_solax_frame(b"$$"))
+
+    def test_event_frames_are_not_realtime_frames(self) -> None:
+        for frame in (
+            FRAME_EVENT_RAISED,
+            FRAME_EVENT_CLEARED_2,
+            FRAME_EVENT_CLEARED_3_4,
+        ):
+            self.assertIsNone(decode_solax_frame(frame))
+
+    def test_decodes_raised_codes(self) -> None:
+        parsed = decode_solax_event_frame(FRAME_EVENT_RAISED)
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual(parsed["run_mode"], 3)
+        self.assertEqual(parsed["dsp_fw_version"], "004.06")
+        self.assertEqual(parsed["rated_power_W"], 1200)
+        self.assertEqual(
+            parsed["event_codes"],
+            [
+                {"code": 2, "cleared": False},
+                {"code": 3, "cleared": False},
+                {"code": 4, "cleared": False},
+            ],
+        )
+
+    def test_decodes_cleared_codes(self) -> None:
+        parsed = decode_solax_event_frame(FRAME_EVENT_CLEARED_2)
+        assert parsed is not None
+        self.assertEqual(parsed["event_codes"], [{"code": 2, "cleared": True}])
+        parsed = decode_solax_event_frame(FRAME_EVENT_CLEARED_3_4)
+        assert parsed is not None
+        self.assertEqual(
+            parsed["event_codes"],
+            [{"code": 3, "cleared": True}, {"code": 4, "cleared": True}],
+        )
+
+    def test_event_decoder_rejects_other_frames(self) -> None:
+        self.assertIsNone(decode_solax_event_frame(FRAME_FW_004_06))
+        self.assertIsNone(decode_solax_event_frame(FRAME_BOOT_FW_STRING))
+        buf = bytearray(FRAME_EVENT_RAISED)
+        buf[-1] ^= 0xFF
+        self.assertIsNone(decode_solax_event_frame(bytes(buf)))
 
 
 if __name__ == "__main__":
