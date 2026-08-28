@@ -1,5 +1,8 @@
 [tool.ruff]
 line-length = 88
+# Markdown code blocks (BOOT_FRAMES.md) are illustrative; ruff >= 0.16 would
+# otherwise try to format them.
+extend-exclude = ["*.md"]
 target-version = "py312"
 
 [tool.ruff.lint]
