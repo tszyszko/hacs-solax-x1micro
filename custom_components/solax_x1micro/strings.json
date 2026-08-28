@@ -21,11 +21,14 @@
         "name": "Run Mode",
         "state": {
           "standby": "Standby",
-          "normal":  "Normal"
+          "normal":  "Normal",
+          "fault":   "Fault"
         }
       },
       "inverter_sn":    { "name": "Inverter Serial Number" },
       "dsp_fw_version": { "name": "DSP Firmware Version" },
+      "event_codes": { "name": "Last Event Codes" },
+      "last_event": { "name": "Last Event" },
       "frames_ok":      { "name": "Valid Frames" },
       "frames_error":   { "name": "Invalid Frames" }
     }

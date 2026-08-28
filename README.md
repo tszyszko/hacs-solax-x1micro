@@ -161,9 +161,11 @@ The integration will subscribe to the following MQTT topics:
 | Temperature 1 | °C | Heatsink / ambient sensor |
 | Temperature 2 | °C | Secondary thermal sensor |
 | Rated Power *(diagnostic)* | W | Inverter nominal rating |
-| Run Mode *(diagnostic)* | — | 1 = Normal, 0 = Standby |
+| Run Mode *(diagnostic)* | — | Normal, Standby or Fault (transient trip reported by an event frame) |
 | Inverter Serial Number *(diagnostic)* | — | Serial number from binary frame |
 | DSP Firmware Version *(diagnostic)* | — | e.g. `005.02`, decoded from the real-time frame |
+| Last Event Codes *(diagnostic)* | — | Status codes from the last event frame, `+n` raised / `-n` cleared. Codes 2, 3, 4 are raised on AC disconnect and cleared on reconnect |
+| Last Event *(diagnostic)* | timestamp | When the last event frame was received |
 
 ---
 

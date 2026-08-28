@@ -21,11 +21,14 @@
         "name": "Mode de fonctionnement",
         "state": {
           "standby": "Veille",
-          "normal":  "Normal"
+          "normal":  "Normal",
+          "fault":   "Défaut"
         }
       },
       "inverter_sn":    { "name": "Numéro de série de l'onduleur" },
       "dsp_fw_version": { "name": "Version du firmware DSP" },
+      "event_codes": { "name": "Derniers codes d'événement" },
+      "last_event": { "name": "Dernier événement" },
       "frames_ok":      { "name": "Trames valides" },
       "frames_error":   { "name": "Trames invalides" }
     }

@@ -12,6 +12,10 @@ _LOGGER = logging.getLogger(__name__)
 FRAME_MAGIC = b"$$"
 FRAME_LENGTH = 107  # exact byte count for a real-time data frame
 FUNC_CODE_REALTIME = 0x1C
+DATA_OFFSET = 0x3A  # start of the data section in 0x1C frames
+RUN_MODE_STANDBY = 0
+RUN_MODE_NORMAL = 1
+RUN_MODE_EVENT = 3  # transient fault / status-code report
 
 
 def crc16_buypass(data: bytes) -> int:
@@ -25,6 +29,75 @@ def crc16_buypass(data: bytes) -> int:
             else:
                 crc = (crc << 1) & 0xFFFF
     return crc
+
+
+def is_valid_solax_frame(data: bytes) -> bool:
+    """Return True if ``data`` is a well-formed ``$$`` frame with a valid CRC.
+
+    Checks magic, declared length and CRC-16/BUYPASS only; says nothing about
+    whether the frame type is one this integration can decode.
+    """
+    if len(data) < 4 or data[:2] != FRAME_MAGIC:
+        return False
+    if struct.unpack_from("<H", data, 2)[0] != len(data):
+        return False
+    expected_crc: int = struct.unpack_from(">H", data, len(data) - 2)[0]
+    return crc16_buypass(data[: len(data) - 2]) == expected_crc
+
+
+def decode_solax_event_frame(data: bytes) -> dict[str, Any] | None:
+    """Decode a variable-length 0x1C *event* frame (run_mode 3).
+
+    Observed on X1-Micro 2 in 1 (firmware 004.06) when the AC side was
+    unplugged and plugged back in: codes 2, 3 and 4 were raised on
+    disconnect (100 B frame) and cleared on reconnect (96 B + 98 B frames),
+    followed ~90 s later by a normal 107-byte real-time frame with no boot
+    sequence in between.
+
+    Layout (header as for the real-time frame, data section from 0x3A):
+      +0   rated_power_W
+      +2   dsp_fw_version (major, minor)
+      +4   run_mode        = 3
+      +5   sub-payload length (u16 LE) = len(frame) - 0x3A - 7 - 2
+      +7   n               number of status codes
+      +8   n x u16 LE      status codes; bit 15 set = code cleared
+                           (0002 0003 0004 on AC disconnect, then 8002,
+                           then 8003 8004 on reconnect)
+      ...  remaining bytes were identical in all three captured frames
+           (PV open-circuit voltages 49.0/49.1 V and 50.03 Hz are
+           recognisable) so they are not live measurements; not decoded.
+
+    Returns None for anything that is not a valid run_mode-3 frame.
+    """
+    if not is_valid_solax_frame(data) or data[7] != FUNC_CODE_REALTIME:
+        return None
+    if len(data) < DATA_OFFSET + 8 + 2:
+        return None
+    if data[DATA_OFFSET + 4] != RUN_MODE_EVENT:
+        return None
+    sub_len: int = struct.unpack_from("<H", data, DATA_OFFSET + 5)[0]
+    if DATA_OFFSET + 7 + sub_len + 2 != len(data):
+        _LOGGER.debug("Event frame sub-payload length mismatch: %d", sub_len)
+        return None
+    count: int = data[DATA_OFFSET + 7]
+    codes_end = DATA_OFFSET + 8 + 2 * count
+    if codes_end > len(data) - 2:
+        _LOGGER.debug("Event frame code list overruns frame: n=%d", count)
+        return None
+    codes: list[dict[str, Any]] = []
+    for i in range(count):
+        raw: int = struct.unpack_from("<H", data, DATA_OFFSET + 8 + 2 * i)[0]
+        codes.append({"code": raw & 0x7FFF, "cleared": bool(raw & 0x8000)})
+
+    return {
+        "wifi_sn": data[8:29].rstrip(b"\x00").decode("ascii", errors="replace"),
+        "inverter_sn": data[37:58].rstrip(b"\x00").decode("ascii", errors="replace"),
+        "dsp_fw_version": f"{data[DATA_OFFSET + 2]:03d}.{data[DATA_OFFSET + 3]:02d}",
+        "rated_power_W": struct.unpack_from("<H", data, DATA_OFFSET)[0],
+        "run_mode": RUN_MODE_EVENT,
+        "event_codes": codes,
+        "total_len": len(data),
+    }
 
 
 def decode_solax_frame(data: bytes) -> dict[str, Any] | None:
@@ -107,6 +180,7 @@ def decode_solax_frame(data: bytes) -> dict[str, Any] | None:
                        the e_total/e_today offsets contain garbage (e.g. 2944,
                        yielding the spurious 294.4 kWh value seen in logs).
                        Rejected by the exact-length check below.
+      96-100-byte:     Event frames (run_mode 3) — see decode_solax_event_frame.
     """
     if len(data) != FRAME_LENGTH:
         _LOGGER.debug(
