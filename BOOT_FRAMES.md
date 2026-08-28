@@ -99,7 +99,7 @@ It shares the function code `0x1C` with the standard 107-byte real-time frame
 but is shorter because:
 
 - The **inverter serial-number** section (21 bytes at `0x25–0x39`) is absent.
-- The first 7 bytes of the standard data section (`rated_power`, `const_0x0205`,
+- The first 7 bytes of the standard data section (`rated_power`, `dsp_fw_version`,
   `run_mode`, `reserved`) are absent.
 
 The remaining 40 bytes of data (starting at `0x25`) are in the same layout as
@@ -176,7 +176,7 @@ Data section — starts at byte `0x25` (corresponds to `+0x07` in the standard f
 
 Sent during the early boot sequence (observed at `06:58:11`, ~5 s after the
 compact frame).  Contains only the header, the full inverter serial number, and
-the first two data words (`rated_power` and `const_0x0205`).  No real-time
+the first two data words (`rated_power` and `dsp_fw_version`).  No real-time
 sensor data is present.
 
 This is likely the dongle announcing the connected inverter's identity and rated
@@ -203,7 +203,7 @@ E8030502C592
 | `0x22–0x23` | FW version | `02 19` | 2.25 |
 | `0x25–0x39` | Inverter SN | `33 30 4D ...` | `30M341010L0619` |
 | `0x3A–0x3B` | Rated power (W) | `E8 03` | 1000 W |
-| `0x3C–0x3D` | Frame-type marker | `05 02` | 0x0205 |
+| `0x3C–0x3D` | DSP firmware version (major, minor) | `05 02` | `005.02` |
 | `0x3E–0x3F` | CRC (BE) | `C5 92` | 0xC592 ✓ |
 
 > **Observation:** Both WiFi SN and Inverter SN are identical
@@ -262,7 +262,7 @@ string in ASCII (`005.03`).
 Sent about 5–6 seconds after the firmware-version frame (observed at
 `06:58:17`).  The frame header and inverter-SN section are identical to the
 standard 107-byte frame, and the first four bytes of the data section
-(`rated_power` and `const_0x0205`) are also correct.  However, from byte `+0x04`
+(`rated_power` and `dsp_fw_version`) are also correct.  However, from byte `+0x04`
 onwards the data is **not real-time sensor values** — it is a configuration /
 register-address dump.
 
@@ -295,7 +295,7 @@ bytes.
 | `0x22–0x23` | FW version | `02 19` | 2.25 |
 | `0x25–0x39` | Inverter SN | `33 30 4D ...` | `30M341010L0619` |
 | `0x3A–0x3B` | Rated power (W) | `E8 03` | 1000 W |
-| `0x3C–0x3D` | Frame-type marker | `05 02` | 0x0205 |
+| `0x3C–0x3D` | DSP firmware version (major, minor) | `05 02` | `005.02` |
 
 ### Layout — config data section (bytes `0x3E`–`0x9B`)
 

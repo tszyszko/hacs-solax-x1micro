@@ -25,6 +25,7 @@
         }
       },
       "inverter_sn":    { "name": "Inverter Serial Number" },
+      "dsp_fw_version": { "name": "DSP Firmware Version" },
       "frames_ok":      { "name": "Valid Frames" },
       "frames_error":   { "name": "Invalid Frames" }
     }
